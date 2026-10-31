@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>熔铸仿写工作流 · 部署站</title>
+<style>
+  :root{--paper:#f5f0e2;--card:#fffdf4;--ink:#2a251b;--muted:#8a7c62;--line:#e2d6b8;--cinnabar:#bf3f22;--teal:#33555a;--gold:#a8842f}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.75}
+  body::before{content:"";display:block;height:6px;background:linear-gradient(90deg,var(--cinnabar) 0 33%,var(--teal) 33% 66%,var(--gold) 66% 100%)}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 18px 60px}
+  h1{font-family:"Songti SC","Noto Serif SC",serif;font-size:30px;letter-spacing:2px;margin:8px 0 4px}
+  .sub{color:var(--muted);font-size:14px;margin:4px 0}
+  h2{font-family:"Songti SC","Noto Serif SC",serif;font-size:20px;margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:12px}
+  .card p{margin:6px 0;font-size:15px}
+  code{background:#f0e8d2;padding:2px 6px;border-radius:5px;font-size:13px;word-break:break-all}
+  pre{background:#2a251b;color:#f5f0e2;padding:14px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.6}
+  a{color:var(--teal)}
+  .note{font-size:13px;color:var(--muted)}
+  .tip{background:#f4ecd0;border-radius:10px;padding:12px 16px;font-size:14px;color:#6b5320}
+  ol,ul{padding-left:22px}
+  li{margin:6px 0;font-size:15px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>熔铸仿写工作流</h1>
+  <p class="sub">转帖来源：阿北 @abeicode · 原仓库 <a href="https://github.com/dama-cyber/Casting-Workflow" target="_blank" rel="noopener">dama-cyber/Casting-Workflow</a> · 许可 MIT</p>
+  <p>从多篇同类型小说中提炼风格指纹，再由 LLM 生成番茄风短篇，带后处理与质量审计。本地 Python 管道，不是网页一键生成器。</p>
+
+  <h2>用法（4 步）</h2>
+  <div class="card">
+    <ol>
+      <li><b>Step 0 · 准备语料</b>：把同类型小说 <code>.txt</code>（每类 ≥5 篇）放入对应分类目录。9 个标准分类：现代言情、总裁豪门、重生复仇、穿越架空、古代言情、玄幻仙侠、悬疑惊悚、甜宠虐恋、种田经商。</li>
+      <li><b>Step 1 · 蒸馏指纹</b>：<pre>python run_pipeline.py --category 05_古代言情</pre>扫描语料 → 剔除损坏文件 → 随机选 5 篇提取指纹（人物 / 情节 / 句式 / 高频词）取交集互消 → 输出 <code>output/fusion_context.txt</code>。</li>
+      <li><b>Step 2 · LLM 生成故事</b>：把 <code>fusion_context.txt</code> 全部内容原封不动复制给 LLM（Claude / GPT / DeepSeek 均可），生成约 1000 字的原创短篇，保存为 <code>output/story.txt</code>。</li>
+      <li><b>Step 3 · 后处理</b>：<pre>python tools/clean_commas.py output/story.txt
+python tools/inject_punctuation.py output/story.txt --excl 0.15 --comma 1.2</pre>清理脏逗号，按密度注入标点，模拟番茄小说风格。</li>
+      <li><b>Step 4 · 质量审计</b>：<pre>python check_story.py output/story.txt
+python tools/audit.py output/story.txt corpus/05_古代言情/*.txt</pre>9 项爆款规则自动检测 + 独创度审计（对比源文，确保 0 复制；朱雀 16 字扫描 vs 全部 5 篇源文 → 0 匹配）。</li>
+    </ol>
+  </div>
+
+  <h2>进阶：12 阶段提示词模式</h2>
+  <div class="card">
+    <p>用 <code>--stage</code> 切入单个创作阶段精细控制，<code>-P</code> 可链式传递前序阶段输出：脑洞 → 灵感风暴 → 人设 → 大纲 → 细纲 → 概要 → 开篇 → 正文 → 优化 → 润色 → 续写 → 扩写。</p>
+    <pre>python run_pipeline.py -s 脑洞 -c 05_古代言情
+python run_pipeline.py -s 人设 -c 05_古代言情 -P output/脑洞_output.txt</pre>
+  </div>
+
+  <div class="tip">运行前提：本地 Python，<code>pip install -r requirements.txt</code>（仅 jieba 分词库）。按原仓库 FAQ：不需要 API 密钥；生成故事那步需自己把上下文贴给 LLM。语料需自备，本部署站不含任何小说原文。</div>
+
+  <h2>文件</h2>
+  <div class="card">
+    <p><a href="README.md">README.md</a> · <a href="SKILL.md">SKILL.md</a> · <a href="run_pipeline.py">run_pipeline.py</a> · <a href="check_story.py">check_story.py</a></p>
+    <p><a href="tools/fusion.py">tools/fusion.py</a> · <a href="tools/clean_commas.py">tools/clean_commas.py</a> · <a href="tools/inject_punctuation.py">tools/inject_punctuation.py</a> · <a href="tools/audit.py">tools/audit.py</a></p>
+    <p><a href="prompt/MAPPING.md">prompt/MAPPING.md</a> · <a href="requirements.txt">requirements.txt</a></p>
+    <p class="note">以上为原仓库文件的部署镜像，最新版以原仓库为准。</p>
+  </div>
+
+  <p style="text-align:center;margin-top:36px"><a href="https://dengzheng122.github.io/zhifu-home/">← 返回智富研究所主页</a></p>
+</div>
+</body>
+</html>
